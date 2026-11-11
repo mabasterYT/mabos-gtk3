@@ -57,6 +57,7 @@ makedepends=(
   git
   glib2-devel
   gobject-introspection
+  gtk-doc
   hicolor-icon-theme
   meson
   sassc
