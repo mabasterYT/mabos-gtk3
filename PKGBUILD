@@ -1,0 +1,129 @@
+# MabOS's GTK 3: Arch's gtk3 with one patch, mabos-user-css-live-reload.patch: open windows read the
+# user's ~/.config/gtk-3.0/gtk.css again when it changes, so a theme switch reaches running apps.
+# PKGBUILD is made from this template by scripts/update.py (package.conf), which follows Arch's packaging
+# (gitlab.archlinux.org/archlinux/packaging/packages/gtk3, the tag in _arch_tag): version,
+# dependencies and Arch's own patch and hooks come from there. Only the gtk3 package is built: demos,
+# docs and tests are left out, and gtk-update-icon-cache stays Arch's. `pacman -S gtk3` goes back.
+
+pkgname=mabos-gtk3
+_arch_tag=1-3.24.52-2 # Arch's packaging this one follows (epoch-pkgver-pkgrel)
+_arch_epoch=1
+pkgver=3.24.52
+pkgrel=2
+pkgdesc="GObject-based multi-platform GUI toolkit (MabOS: the user's gtk.css reloads live)"
+url="https://github.com/mabasterYT/mabos-gtk3"
+arch=(x86_64)
+license=(LGPL-2.1-or-later)
+depends=(
+  adwaita-fonts
+  adwaita-icon-theme
+  at-spi2-core
+  cairo
+  dconf
+  desktop-file-utils
+  fontconfig
+  fribidi
+  gdk-pixbuf2
+  glib2
+  glibc
+  harfbuzz
+  iso-codes
+  libcloudproviders
+  libcolord
+  libcups
+  libegl
+  libepoxy
+  libgl
+  librsvg
+  libx11
+  libxcomposite
+  libxcursor
+  libxdamage
+  libxext
+  libxfixes
+  libxi
+  libxinerama
+  libxkbcommon
+  libxrandr
+  libxrender
+  pango
+  shared-mime-info
+  tinysparql
+  wayland
+  zlib
+  gtk-update-icon-cache
+)
+makedepends=(
+  git
+  glib2-devel
+  gobject-introspection
+  hicolor-icon-theme
+  meson
+  sassc
+  wayland-protocols
+)
+optdepends=(
+  'papers: default print previewer'
+  'evince: legacy print previewer'
+)
+provides=(
+  "gtk3=$_arch_epoch:$pkgver"
+  gtk3-print-backends
+  libgailutil-3.so
+  libgdk-3.so
+  libgtk-3.so
+)
+conflicts=(gtk3 gtk3-print-backends)
+options=(!debug)
+source=(
+  "git+https://gitlab.gnome.org/GNOME/gtk.git#tag=$pkgver"
+  gtk-query-immodules-3.0.hook
+  gtk-remove-immodules-cache.hook
+  0001-Allow-disabling-legacy-Tracker-search.patch
+  mabos-user-css-live-reload.patch
+)
+b2sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+prepare() {
+  cd gtk
+
+  # Arch's: don't try to use the old Tracker
+  git apply -3 ../0001-Allow-disabling-legacy-Tracker-search.patch
+  patch -Np1 -i ../mabos-user-css-live-reload.patch
+}
+
+build() {
+  local meson_options=(
+    -D broadway_backend=true
+    -D cloudproviders=true
+    -D colord=yes
+    -D gtk_doc=false
+    -D introspection=true
+    -D man=true
+    -D tracker=false
+    -D tracker3=true
+    -D demos=false
+    -D examples=false
+    -D tests=false
+  )
+
+  CFLAGS+=" -DG_DISABLE_CAST_CHECKS"
+  arch-meson gtk build "${meson_options[@]}"
+  meson compile -C build
+}
+
+package() {
+  meson install -C build --destdir "$pkgdir"
+
+  install -Dm644 /dev/stdin "$pkgdir/usr/share/gtk-3.0/settings.ini" <<END
+[Settings]
+gtk-icon-theme-name = Adwaita
+gtk-theme-name = Adwaita
+gtk-font-name = Adwaita Sans 11
+END
+
+  install -Dm644 gtk-*.hook -t "$pkgdir/usr/share/libalpm/hooks"
+
+  # Arch's gtk-update-icon-cache package has these (built by GTK 4, shared with GTK 3)
+  rm -f "$pkgdir/usr/bin/gtk-update-icon-cache" "$pkgdir/usr/share/man/man1/gtk-update-icon-cache.1"
+}
